@@ -1,0 +1,19 @@
+{
+  "name": "vines",
+  "version": "0.0.1",
+  "description": "a gossip protocol implementation",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test/test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github.com/hij1nx/vines"
+  },
+  "keywords": [
+    "gossip",
+    "git"
+  ],
+  "author": "Paolo Fragomeni",
+  "license": "MIT"
+}

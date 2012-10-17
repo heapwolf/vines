@@ -1,57 +1,51 @@
 
-
 var test = require('tap').test;
 var Vine = require('../../vine');
 
 module.exports = {
 
   "Should receive a list of peers when a peer joins": function(test) {
-
-    test.plan(2);
+    
+    test.plan(1)
 
     var vine1
     var vine2
 
-    vine1 = Vine(function(vine) {
+    vine1 = Vine().listen(8001, '127.0.0.1')
 
-      console.log('vine 1 started')
+    vine1.on('list', function(data) {
 
-      this.on('list', function(data, b) {
+      test.ok(data, 'got the list');
+      vine1.close();
+      vine2.close();
+    })
 
-        test.equal(typeof data, 'object', 'got the list')
-        vine1.close()
-      });
+    vine2 = Vine().listen(8002, '127.0.0.1').join(8001)
 
-    }).listen(8001)
+  },
+
+  "Data should circulate": function(test) {
+
+    test.plan(1)
+
+    var vine1
+    var vine2
+
+    vine1 = Vine().listen(8003, '127.0.0.1')
+
+    vine1.set('foo', 'helllo, world')
+
+    vine1.on('list', function(data) {
+
+      test.ok(data, 'got the list')
+      vine1.close();
+      vine2.close();
+    })
+
+    vine2 = Vine().listen(8004, '127.0.0.1').join(8003)
 
     setTimeout(function() {
-
-      vine2 = Vine(function(vine) {
-        
-        var that = this
-        console.log('vine 2 started')
-
-        this.on('sent', function(err, peer, data) {
-
-          if (data.meta.type === 'list') {
-            console.log('vine 2 sent peer list to vine 1')
-          }
-
-          if (err) {
-            test.fail(err);
-            
-          }
-          else {
-            test.ok(true, 'the list was sent')
-            that.close()
-          }
-        })
-      })
-        .listen(8002)
-        .join('127.0.0.1', 8001)
-
-    }, 2000)
-
+      console.log(vine2.get('foo'))
+    }, 1000);
   }
 };
-

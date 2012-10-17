@@ -1,10 +1,21 @@
 
+
 var dgram = require('dgram');
-var uuid = require('uuid');
+var EventEmitter = require('events').EventEmitter;
+var util = require('util');
+
+var uuid = require('node-uuid');
 var ip = require('./common/ip');
 var diff = require('./common/diff');
 
 Timers = {};
+
+var clearTimers = function() {
+  for(var timer in Timers) {
+    clearTimeout(Timers[timer]);
+    delete Timers[timer];
+  }
+};
 
 var Timer = function Timer(timeout, uuid, callback) {
 
@@ -37,9 +48,16 @@ var Vine = module.exports = function Vine(opts, callback) {
     return new Vine(opts, callback);
   }
 
+  EventEmitter.call(this);
+
+  if(!arguments[1]) {
+    callback = opts;
+    opts = {};
+  }
+
   var that = this;
 
-  this.peers = {};
+  this.peers = opts.peers || {};
   this.defaultTimeout = opts.timeout || 1e4;
 
   var server = this.server = dgram.createSocket('udp4');
@@ -49,7 +67,7 @@ var Vine = module.exports = function Vine(opts, callback) {
   //
   // A data structure representing the peer's important details.
   //
-  this.details = { 
+  this.details = {
 
     uuid: id,
     address: ip.externalAddress(),
@@ -57,57 +75,102 @@ var Vine = module.exports = function Vine(opts, callback) {
 
     alive: true,
     lifetime: 0,
-    timeout: defaultTimeout,
-    heartBeatInterval: opts.hbInterval || 3e4,
-    broadcastPeersInterval: opts.bpInterval || 6e4
+    timeout: this.defaultTimeout,
+    heartbeatInterval: opts.hbInterval || 3e4,
+    sendInterval: opts.bpInterval || 1e4
   };
 
   this.peers[id] = this.details;
 
-  server.on('message', this.receiveMessage);
-  server.on('listening', callback.bind(server));
+  server.on('message', this.receive.bind(this));
 
-  setInterval(function() {
+  server.on('listening', function() {
+    callback && callback.call(that, that.details);
+  });
+
+  this.heartbeat = setInterval(function() {
     ++that.lifetime;
-  }, this.details.heartBeatInterval);
+  }, this.details.heartbeatInterval);
 
-  setInterval(
-    this.broadcastPeers,
-    this.details.broadcastPeersInterval
-  );
+  this.broadcast = setInterval(function() {
+    that.send('list', that.peers);
+  }, this.details.sendInterval);
 };
 
+util.inherits(Vine, EventEmitter);
+
 Vine.prototype.listen = function(port) {
-  server.bind(port || this.details.port);
+  this.server.bind(port || this.details.port);
   return this;
 };
 
-Vine.prototype.broadcastPeers = function() {
+Vine.prototype.close = function(port) {
+
+  clearInterval(this.heartbeat);
+  clearInterval(this.broadcast);
+
+  clearTimers();
+
+  this.server.close();
+
+  return this;
+};
+
+Vine.prototype.join = function(address, port) {
+  this.send('list', this.peers, address, port);
+  return this;
+};
+
+//
+// send a message to a random peer.
+//
+Vine.prototype.send = function(type, data, address, port) {
 
   ++this.lifetime;
 
-  var peer = this.randomPeer();
+  var that = this;
+  var peer;
+
+  //
+  // get a random peer, or provide one
+  // 
+  if (!address && !port) {
+    peer = this.randomPeer();
+
+    if (peer === null) {
+      return this;
+    }
+  } 
+  else {
+
+    peer = {
+      address: address,
+      port: port
+    }
+  }
 
   var msg = {
 
     meta: { 
-      type: 'list'
+      type: type
     },
-    data: this.peers 
+    data: data
   };
 
   var message = new Buffer(JSON.stringify(msg));
-
   var vine = dgram.createSocket('udp4');
+
+  that.emit('send', peer, msg);
 
   vine.send(
 
     message,
     0,
     message.length, 
-    peer.port, 
+    peer.port,
     peer.address, 
     function(err, bytes) {
+      that.emit('sent', err, peer, msg);
       vine.close();
     }
   );
@@ -120,34 +183,28 @@ Vine.prototype.receive = function(msg, rinfo) {
   var that = this;
 
   try {
-    msg = JSON.parse(msg);
+    msg = JSON.parse(String(msg));
   }
   catch(ex) {
     return false;
   }
 
-  if (!msg.meta && !msg.meta.type && !msg.meta.data) {
-    return false; // not a message type we can understand.
+  that.emit('data', msg, rinfo);
+
+  if (!msg.meta && !msg.meta.type && !msg.data) {
+    return false; // not a message we understand.
   }
 
-  // 
-  // Merge remote list (received from peer), and our local member list.
-  // Simply, we must update the heartbeats that the remote list has with
-  // our list.  Also, some additional logic is needed to make sure we have 
-  // not timed out a member and then immediately received a list with that 
-  // member.
-  // 
-  var mergeLists = function(msg) {
-
-  };
-
+  // handle merging the lists
   if (msg.meta.type === 'list') {
+
+    that.emit('list', msg.data, rinfo);
 
     var peers = msg.data; // the message data is a list of peers.
 
     for (peerId in peers) {
 
-      var knownPeer = this.peers[peerId]; // do we know this peer?
+      var knownPeer = that.peers[peerId]; // do we know this peer?
 
       if (knownPeer) {
 
@@ -174,14 +231,13 @@ Vine.prototype.receive = function(msg, rinfo) {
 
         // creat a timer for this peer
         var timeout = peers[peerId].timeout || this.defaultTimeout;
-        
+
           Timer(timeout, peerId, function() {
 
           //
-          // if we dont hear from this peer for a while
-          // we will stop trying to broadcast to it unless
-          // we hear from it again. We can also run some
-          // arbitary user function.
+          // if we dont hear from this peer for a while,
+          // stop trying to broadcast to it until we hear 
+          // from it again.
           //
           that.peers[peerId].alive = false;
         });
@@ -196,17 +252,20 @@ Vine.prototype.randomPeer = function() {
 
   var keys = Object.keys(this.peers);
 
-  for (var i = 0, attempts = 10; i < l i++) {
+  for (var i = 0, attempts = 10; i < attempts; i++) {
 
-    var randomKey = Math.random() * keys.length;
-    var randomPeer = this.peers[randomKey];
-    var isAlive = randomPeer.alive;
-    var isDifferent = randomPeer.uuid !== this.details.uuid;
+    var index = Math.floor(Math.random() * keys.length);
+    var key = keys[index];
+
+    var peer = this.peers[key];
+
+    var isAlive = peer.alive;
+    var isDifferent = (key !== this.details.uuid);
 
     if (isDifferent && isAlive) {
-      return this.peers[randompeer];
+      return peer;
     }
   }
 
-  return this;
+  return null;
 };

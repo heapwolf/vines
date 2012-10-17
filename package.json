@@ -14,6 +14,12 @@
     "gossip",
     "git"
   ],
+  "dependencies": {
+    "node-uuid": "1.3.x"
+  },
+  "devDependencies": {
+    "tap": "*"
+  },
   "author": "Paolo Fragomeni",
   "license": "MIT"
 }

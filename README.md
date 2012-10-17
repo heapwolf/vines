@@ -1,41 +1,15 @@
 
-//
-// Tenants of gossip...
-//
 
-//
-// ## 
-// The core of the protocol involves periodic, 
-// pairwise, inter-process interactions.
-//
+# Tenants of Vines
 
-//
-// ## 
-// The information exchanged during these 
-// interactions is of bounded size.
-//
+## Periodic, binary interactions
 
-//
-// ## 
-// When agents interact, the state of at least
-// one agent changes to reflect the state of the other.
-//
+## Low frequency of interactions
 
-//
-// ## 
-// Reliable communication is not assumed.
-//
+## Randomization of interactions
 
-//
-// ##
-// The frequency of the interactions is low compared 
-// to typical message latencies so that the protocol 
-// costs are negligible.
-//
+## Size-Bound data exchanges
 
-//
-// ##
-// There is some form of randomness in the peer 
-// selection. Peers might be selected from the 
-// full set of nodes or from a smaller set of neighbors.
-//
+## Agents adapt state on interaction
+
+## Communication is not reliable.

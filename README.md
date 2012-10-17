@@ -1,15 +1,17 @@
 
 
-# Tenants of Vines
+# Vines
 
-## Periodic, binary interactions
+- Periodic, binary interactions
 
-## Low frequency of interactions
+- Low frequency of interactions
 
-## Randomization of interactions
+- Randomization of interactions
 
-## Size-Bound data exchanges
+- Agents adapt state on interaction
 
-## Agents adapt state on interaction
+- Size-Bound data exchanges
 
-## Communication is not reliable.
+- Reliability is UDP-ish
+
+

@@ -35,13 +35,6 @@ module.exports = {
 
     vine1.set('foo', 'helllo, world')
 
-    vine1.on('list', function(data) {
-
-      test.ok(data, 'got the list')
-      vine1.close();
-      vine2.close();
-    })
-
     vine2 = Vine().listen(8004, '127.0.0.1').join(8003)
 
     setTimeout(function() {

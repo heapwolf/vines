@@ -1,4 +1,15 @@
 
+//
+// - We need to have a conversation with the peer.
+// - I send a random peer some gossip (not really, a sha1 hash).
+// - It tells me if it's interested (hey i dont know about that).
+// - If it's interested, send it the actual value from the key
+//
+// The addresses
+//   4. Agents adapt state on interaction
+//   5. Size-Bound data exchanges
+//
+
 var net = require('net');
 var EventEmitter = require('events').EventEmitter;
 var util = require('util');
@@ -8,48 +19,6 @@ var uuid = require('node-uuid'); // we need unique IDs.
 var ip = require('./common/ip'); // for discovering the external IP address
 var diff = require('./common/diff'); // not used yet.
 var SHash = require('./common/SHash'); // A special collection type
-
-var timers = {};
-var dataStore = SHash();
-
-var clearTimers = function() { // on exit, kill all timers.
-  for(var timer in timers) {
-    clearTimeout(timers[timer]);
-    delete timers[timer];
-  }
-};
-
-//
-// a timer is used to keep track of how long its been 
-// since we've heard from a peer. If the timer runs out
-// we stop trying to broadcast to that peer by marking
-// it as dead. If we hear from it again, it gets marked
-// as alive.
-//
-var Timer = function Timer(timeout, uuid, callback) {
-
-  if(!(this instanceof Timer)) {
-    return timers[uuid] = new Timer(timeout, uuid);
-  }
-
-  this.callback = callback;
-  this.timeout = timeout;
-  this.uuid = uuid;
-};
-
-Timer.prototype.start = function() {
-  this.timer = setTimeout(this.callback, this.timeout);
-};
-
-Timer.prototype.stop = function() {
-  clearTimeout(this.timer);
-  delete timers[this.uuid];
-};
-
-Timer.prototype.reset = function() {
-  clearTimeout(this.timer);
-  this.start();
-};
 
 var Vine = module.exports = function Vine(opts, callback) {
 
@@ -114,6 +83,40 @@ var Vine = module.exports = function Vine(opts, callback) {
 };
 
 util.inherits(Vine, EventEmitter);
+
+//
+// listen for messages from other peers.
+//
+Vine.prototype.listen = function(port, address) {
+
+  var that = this;
+
+  that.server.listen(port || that.details.port, address, function() {
+
+    //
+    // we want to send of the list at an interval.
+    //
+    that.listInterval = setInterval(function() {
+      that.send('list', that.peers);
+    }, that.details.listInterval);
+
+    //
+    // we want to send off a random pair at an interval.
+    //
+    that.hashInterval = setInterval(function() {
+      that.send('gossip', dataStore.randomPair());
+    }, that.details.hashInterval);
+
+    //
+    // we want to live.
+    //
+    that.heartbeatInterval = setInterval(function() {
+      ++that.lifetime;
+    }, that.details.heartbeatInterval);
+  });
+
+  return this;
+};
 
 //
 // receive a message from a peer.
@@ -236,156 +239,4 @@ Vine.prototype.receive = function(msg, socket) {
   }
 
   return this;
-};
-
-//
-// send a message to a random peer.
-//
-Vine.prototype.send = function(type, data, port, address) {
-
-  ++this.lifetime;
-
-  var that = this;
-
-  //
-  // get a random peer, or provide one
-  // 
-  if (!address && !port) {
-
-    var peer = this.randomPeer();
-
-    if (peer === null) {
-      return this;
-    }
-
-    address = peer.address;
-    port = peer.port;
-
-  }
-  else if (!address) {
-    address = '127.0.0.1';
-  }
-
-  var msg = {
-
-    meta: { 
-      type: type
-    },
-    data: data
-  };
-
-  that.emit('send', peer, msg);
-  
-  var message = new Buffer(JSON.stringify(msg));
-
-  var client = net.connect({
-    port: port, 
-    host: address 
-  });
-
-  client.on('connect', function() {
-    that.emit('sent', peer, msg);
-    client.write(message);
-  });
-
-  return this;
-};
-
-//
-// set a local value on this peer.
-//
-Vine.prototype.set = function(key, val) {
-
-  dataStore.set(key, val);
-};
-
-//
-// get a local value from this peer.
-//
-Vine.prototype.get = function(key) {
-
-  return dataStore.get(key);
-};
-
-//
-// listen for messages from other peers.
-//
-Vine.prototype.listen = function(port, address) {
-
-  var that = this;
-
-  that.server.listen(port || that.details.port, address, function() {
-
-    //
-    // we want to send of the list at an interval.
-    //
-    that.listInterval = setInterval(function() {
-      that.send('list', that.peers);
-    }, that.details.listInterval);
-
-    //
-    // we want to send off a random pair at an interval.
-    //
-    that.hashInterval = setInterval(function() {
-      that.send('gossip', dataStore.randomPair());
-    }, that.details.hashInterval);
-
-    //
-    // we want to measure our lifetime.
-    //
-    that.heartbeatInterval = setInterval(function() {
-      ++that.lifetime;
-    }, that.details.heartbeatInterval);
-  });
-
-  return this;
-};
-
-//
-// be done.
-//
-Vine.prototype.close = function(port) {
-
-  clearInterval(this.heartbeatInterval);
-  clearInterval(this.listInterval);
-  clearInterval(this.hashInterval);
-
-  clearTimers();
-
-  this.server.close();
-
-  return this;
-};
-
-//
-// join an existing peer by sending the list of known peers.
-//
-Vine.prototype.join = function(port, address) {
-  this.send('list', this.peers, port, address);
-  return this;
-};
-
-//
-// get a random peer from the list of known peers.
-//
-Vine.prototype.randomPeer = function() {
-
-  var keys = Object.keys(this.peers);
-
-  for (var i = 0, attempts = 10; i < attempts; i++) {
-
-    var index = Math.floor(Math.random() * keys.length);
-    var key = keys[index];
-
-    var peer = this.peers[key];
-
-    var isAlive = peer.alive;
-    var isDifferent = (key !== this.details.uuid);
-
-    if (isDifferent && isAlive) {
-      return peer;
-    }
-  }
-
-  return null;
 };

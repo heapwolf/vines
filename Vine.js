@@ -8,11 +8,15 @@ var uuid = require('node-uuid'); // we need unique IDs.
 var ip = require('./common/ip'); // for discovering the external IP address
 var diff = require('./common/diff'); // not used yet.
 var SHash = require('./common/SHash'); // A special collection type
+var BallotBox = require('./common/BallotBox'); // for voting
 
 var timers = {};
+
 var dataStore = SHash();
+var ballotbox = BallotBox();
 
 var clearTimers = function() { // on exit, kill all timers.
+
   for(var timer in timers) {
     clearTimeout(timers[timer]);
     delete timers[timer];
@@ -70,13 +74,13 @@ var Vine = module.exports = function Vine(opts, callback) {
   this.defaultTimeout = opts.timeout || 1e4;
 
   var server = this.server = net.createServer(function(socket) {
-    
+
     //
     // when we get data, decide if 
     // we are interested in it or not.
     //
     socket.on('data', function(data) {
-      
+
       //
       // we pass in the socket so that 
       // we can have a conversation if
@@ -104,7 +108,7 @@ var Vine = module.exports = function Vine(opts, callback) {
     timeout: this.defaultTimeout,
     heartbeatInterval: opts.heartbeatInterval || 3e4,
     listInterval: opts.listInterval || 6e4,
-    hashInterval: opts.listInterval || 1e4
+    hashInterval: opts.hashInterval || 1e4
   };
 
   //
@@ -119,6 +123,8 @@ util.inherits(Vine, EventEmitter);
 // receive a message from a peer.
 //
 Vine.prototype.receive = function(msg, socket) {
+
+
 
   var that = this;
 
@@ -137,7 +143,7 @@ Vine.prototype.receive = function(msg, socket) {
 
   that.emit(msg.meta.type, msg.data, socket);
 
-  if (msg.meta.type === 'gossip') { // handle incoming key/hash pair.
+  if (msg.meta.type === 'gossip') {
 
     var key = msg.data[0];
     var hash = msg.data[1];
@@ -160,7 +166,6 @@ Vine.prototype.receive = function(msg, socket) {
       //
       socket.end();
     }
-
   }
   else if (msg.meta.type === 'request') {
 
@@ -186,6 +191,44 @@ Vine.prototype.receive = function(msg, socket) {
     dataStore.setUnique(msg.data.key, msg.data.value);
     socket.end();
   }
+  else if (msg.meta.type === 'votes') {
+
+    var data = msg.data;
+
+    //
+    // first of all, does this peer care about this election?
+    //
+    if (ballotbox.elections[data.topic]) {
+
+      //
+      // we do care about this election, merge in the new votes.
+      //
+      ballotbox.mergeVotes(data.topic, data, this.details.uuid);
+
+      if (!ballotbox.decide(data.topic, this.details.uuid)) {
+
+        //
+        // we have not yet come to a quorum, we should end this
+        // socket and send the votes to another random peer.
+        //
+        this.send('votes', ballotbox.elections[data.topic]);
+      }
+      else {
+
+        //
+        // success! let the user know we have a quorum and that
+        // the reults are in (the election will be closed).
+        //
+        this.emit(
+          'quorum', 
+          data.topic, 
+          ballotbox.elections[data.topic],
+          ballotbox.results[data.topic]
+        );
+      }
+    }
+    socket.end();
+  }
   else if (msg.meta.type === 'list') { // handle merging the lists
 
     var peers = msg.data; // the message data is a list of peers.
@@ -199,14 +242,14 @@ Vine.prototype.receive = function(msg, socket) {
         //
         // compare the lifetime of the peers.
         //
-        if (peers[peerId].lifetime > knownPeer.lifetime) {
+        if (peers[peerId].details.lifetime > knownPeer.details.lifetime) {
 
           if (peers[peerId].alive === false) {
             peers[peerId].alive = true; // revive this peer.
           }
 
           // update the peer with latest heartbeat
-          knownPeer.lifetime = peers[peerId].lifetime;
+          knownPeer.details.lifetime = peers[peerId].details.lifetime;
 
           // and reset the timeout of that peer
           timers[peerId].reset();
@@ -243,7 +286,7 @@ Vine.prototype.receive = function(msg, socket) {
 //
 Vine.prototype.send = function(type, data, port, address) {
 
-  ++this.lifetime;
+  ++this.details.lifetime;
 
   var that = this;
 
@@ -274,8 +317,8 @@ Vine.prototype.send = function(type, data, port, address) {
     data: data
   };
 
-  that.emit('send', peer, msg);
-  
+  that.emit('send', port, address, msg);
+
   var message = new Buffer(JSON.stringify(msg));
 
   var client = net.connect({
@@ -283,8 +326,13 @@ Vine.prototype.send = function(type, data, port, address) {
     host: address 
   });
 
+  client.on('error', function(err) {
+    // do nothing
+  })
+
   client.on('connect', function() {
-    that.emit('sent', peer, msg);
+
+    that.emit('sent', port, address, msg);
     client.write(message);
   });
 
@@ -308,13 +356,50 @@ Vine.prototype.get = function(key) {
 };
 
 //
+// get a local value from this peer. voting happens
+// agressively, each time a vote is cast, it sends to
+// a random peer the entire contents of the ballotbox.
+//
+Vine.prototype.vote = function(topic, value) {
+
+  //
+  // each time a vote is cast, we can check to see if
+  // we have reached a quorum, if not then send off the
+  // votes that we know about to the next random peer.
+  //
+  var result = ballotbox.vote(this.details.uuid, topic, value);
+
+  if (result) {
+
+    return this.emit(
+      'quorum', 
+      topic, 
+      ballotbox.elections[topic],
+      ballotbox.results[topic]
+    );
+  }
+  else {
+    return this.send('votes', ballotbox.elections[topic]);
+  }
+};
+
+Vine.prototype.election = function(opts) {
+  ballotbox.election(opts);
+  return this;
+};
+
+//
 // listen for messages from other peers.
 //
 Vine.prototype.listen = function(port, address) {
 
   var that = this;
 
-  that.server.listen(port || that.details.port, address, function() {
+  if (port) {
+    that.details.port = port;
+  }
+
+  that.server.listen(that.details.port, address, function() {
 
     //
     // we want to send of the list at an interval.
@@ -334,7 +419,7 @@ Vine.prototype.listen = function(port, address) {
     // we want to measure our lifetime.
     //
     that.heartbeatInterval = setInterval(function() {
-      ++that.lifetime;
+      ++that.details.lifetime;
     }, that.details.heartbeatInterval);
   });
 

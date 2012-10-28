@@ -1,6 +1,5 @@
-
-var test = require('tap').test;
-var Vine = require('../../vine');
+var test = require('tap').test
+var Vine = require('../../vine')
 
 module.exports = {
 
@@ -11,7 +10,7 @@ module.exports = {
     var vine1
     var vine2
 
-    vine1 = Vine().listen(8001, '127.0.0.1')
+    vine1 = Vine().listen(8001)
 
     vine1.on('list', function(data) {
 
@@ -20,7 +19,7 @@ module.exports = {
       vine2.close();
     })
 
-    vine2 = Vine().listen(8002, '127.0.0.1').join(8001)
+    vine2 = Vine().listen(8002).join(8001)
 
   },
 
@@ -31,14 +30,16 @@ module.exports = {
     var vine1
     var vine2
 
-    vine1 = Vine().listen(8003, '127.0.0.1')
+    vine1 = Vine().listen(8003)
 
-    vine1.set('foo', 'helllo, world')
+    vine1.set('foo', 'hello, world')
 
-    vine2 = Vine().listen(8004, '127.0.0.1').join(8003)
+    vine2 = Vine().listen(8004).join(8003)
 
     setTimeout(function() {
-      console.log(vine2.get('foo'))
+      test.equal('hello, world', vine2.get('foo'))
+      vine1.close()
+      vine2.close()
     }, 1000);
   }
 };

@@ -45,7 +45,9 @@ crashes by adjusting the convergence rate.
 # Reference Papers and Articles
 
 [How robust are gossip-based communication protocols?][0]
+
 [An Efficient Implementation of the Quorum Consensus Protocol][1]
+
 [Distributed systems principles and paradigms 2nd edition][2]
 
 [0]:http://www.cs.utexas.edu/~lorenzo/papers/p14-alvisi.pdf

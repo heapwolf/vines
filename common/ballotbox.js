@@ -46,16 +46,16 @@ BallotBox.prototype.vote = function(uuid, topic, data) {
     return election;
   }
 
-  if (election.deadline) {
+  if (election.expire) {
 
     var now = new Date(Date.now());
-    var deadline = new Date(election.deadline);
+    var expire = new Date(election.expire);
 
-    if (now > deadline) {
+    if (now > expire) {
 
       //
       // if the current date/time is greater than the 
-      // deadline, this is an automatic win for aborting.
+      // expire, this is an automatic win for aborting.
       //
       election.result = null;
       election.closed = true;
@@ -211,7 +211,7 @@ BallotBox.prototype.decide = function(uuid, topic) {
 //
 // @@total {Number} the total number of systems known
 // @@min {Number} minimum votes needed to satisfy an election
-// @@deadline {String} represents a serialized future date
+// @@expire {String} represents a serialized future date
 //
 BallotBox.prototype.election = function(opts) {
 
@@ -234,7 +234,7 @@ BallotBox.prototype.election = function(opts) {
     total: opts.total || null,
 
     ctime: String(new Date(Date.now())),
-    deadline: opts.deadline || null,
+    expire: opts.expire || null,
     expired: false,
 
     votes: {},

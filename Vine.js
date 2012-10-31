@@ -375,7 +375,13 @@ Vine.prototype.vote = function(topic, value) {
 
   if (result.closed) {
 
-    var event = result.expired ? 'deadline' : 'quorum';
+    var event = result.expired ? 'expire' : 'quorum';
+
+    //
+    // TODO: workflow does not end here. need to contact the
+    // origin; the election must still be open, if it is,
+    // close it, if we can do this then we can emit quorum.
+    //
 
     return this.emit(
       event,
@@ -439,20 +445,14 @@ Vine.prototype.listen = function(port, address) {
   return this;
 };
 
-//
-// be done.
-//
-Vine.prototype.clear = function() {
+Vine.prototype.close = function() {
+
   clearInterval(this.heartbeatInterval);
   clearInterval(this.listInterval);
   clearInterval(this.hashInterval);
 
   clearTimers();
 
-};
-Vine.prototype.close = function() {
-
-  this.clear();
   this.server.close();
 
   return this;

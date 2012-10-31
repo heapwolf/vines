@@ -3,7 +3,7 @@ var Vine = require('../../vine')
 
 module.exports = {
 
-  "Should receive a list of peers when a peer joins": function(test) {
+  "A list of known peers should circulate between peers": function(test) {
     
     test.plan(1)
 
@@ -14,16 +14,16 @@ module.exports = {
 
     vine1.on('list', function(data) {
 
-      test.ok(data, 'got the list');
-      vine1.close();
-      vine2.close();
+      test.ok(data, 'got the list')
+      vine1.close()
+      vine2.close()
     })
 
     vine2 = Vine().listen(8002).join(8001)
 
   },
 
-  "Data should circulate": function(test) {
+  "Data should circulate between peers": function(test) {
 
     test.plan(1)
 
@@ -37,9 +37,12 @@ module.exports = {
     vine2 = Vine().listen(8004).join(8003)
 
     setTimeout(function() {
+
+      //need to get this from an emit
       test.equal('hello, world', vine2.get('foo'))
       vine1.close()
       vine2.close()
-    }, 1000);
+
+    }, 4000);
   }
 };

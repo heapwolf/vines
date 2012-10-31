@@ -18,7 +18,7 @@ var ballotbox = BallotBox();
 var clearTimers = function() { // on exit, kill all timers.
 
   for(var timer in timers) {
-    clearTimeout(timers[timer]);
+    clearTimeout(timers[timer].timer);
     delete timers[timer];
   }
 };
@@ -33,15 +33,17 @@ var clearTimers = function() { // on exit, kill all timers.
 var Timer = function Timer(timeout, uuid, callback) {
 
   if(!(this instanceof Timer)) {
-    return timers[uuid] = new Timer(timeout, uuid);
+    return timers[uuid] = new Timer(timeout, uuid, callback);
   }
 
   this.callback = callback;
   this.timeout = timeout;
   this.uuid = uuid;
+  this.timer = null;
 };
 
 Timer.prototype.start = function() {
+  
   this.timer = setTimeout(this.callback, this.timeout);
 };
 
@@ -106,9 +108,9 @@ var Vine = module.exports = function Vine(opts, callback) {
     alive: true,
     lifetime: 0,
     timeout: this.defaultTimeout,
-    heartbeatInterval: opts.heartbeatInterval || 3e4,
-    listInterval: opts.listInterval || 6e4,
-    hashInterval: opts.hashInterval || 1e4
+    heartbeatInterval: opts.heartbeatInterval || 100,
+    listInterval: opts.listInterval || 300,
+    hashInterval: opts.hashInterval || 300
   };
 
   //
@@ -123,8 +125,6 @@ util.inherits(Vine, EventEmitter);
 // receive a message from a peer.
 //
 Vine.prototype.receive = function(msg, socket) {
-
-
 
   var that = this;
 
@@ -203,9 +203,9 @@ Vine.prototype.receive = function(msg, socket) {
       //
       // we do care about this election, merge in the new votes.
       //
-      ballotbox.mergeVotes(data.topic, data, this.details.uuid);
+      ballotbox.merge(this.details.uuid, data.topic, data);
 
-      if (!ballotbox.decide(data.topic, this.details.uuid)) {
+      if (!ballotbox.decide(this.details.uuid, data.topic)) {
 
         //
         // we have not yet come to a quorum, we should end this
@@ -242,36 +242,40 @@ Vine.prototype.receive = function(msg, socket) {
         //
         // compare the lifetime of the peers.
         //
-        if (peers[peerId].details.lifetime > knownPeer.details.lifetime) {
+        if (peers[peerId].lifetime > knownPeer.lifetime) {
 
           if (peers[peerId].alive === false) {
             peers[peerId].alive = true; // revive this peer.
           }
 
           // update the peer with latest heartbeat
-          knownPeer.details.lifetime = peers[peerId].details.lifetime;
+          knownPeer.lifetime = peers[peerId].lifetime;
 
           // and reset the timeout of that peer
-          timers[peerId].reset();
+          timers[peerId] && timers[peerId].reset();
         }
       }
       else { // this is a new peer
 
         // add it to the peers list
-        this.peers[peerId] = peers[peerId];
+        that.peers[peerId] = peers[peerId];
 
         // creat a timer for this peer
         var timeout = peers[peerId].timeout || this.defaultTimeout;
 
-          Timer(timeout, peerId, function() {
+        var timer = Timer(timeout, peerId, (function(peerId) {
+          return function() {
+            
+            //
+            // if we dont hear from this peer for a while,
+            // stop trying to broadcast to it until we hear 
+            // from it again.
+            //
+            that.peers[peerId].alive = false;
+          }
+        }(peerId)));
 
-          //
-          // if we dont hear from this peer for a while,
-          // stop trying to broadcast to it until we hear 
-          // from it again.
-          //
-          that.peers[peerId].alive = false;
-        });
+        timer.start();
       }
     }
 
@@ -369,21 +373,30 @@ Vine.prototype.vote = function(topic, value) {
   //
   var result = ballotbox.vote(this.details.uuid, topic, value);
 
-  if (result) {
+  if (result.closed) {
+
+    var event = result.expired ? 'deadline' : 'quorum';
 
     return this.emit(
-      'quorum', 
-      topic, 
-      ballotbox.elections[topic],
-      ballotbox.results[topic]
+      event,
+      topic,
+      ballotbox.elections[topic]
     );
   }
   else {
+
     return this.send('votes', ballotbox.elections[topic]);
   }
 };
 
 Vine.prototype.election = function(opts) {
+
+  //
+  // track the peer creating the election, it
+  // will become the election manager peer.
+  //
+  opts.origin = this.details.uuid;
+
   ballotbox.election(opts);
   return this;
 };
@@ -429,14 +442,17 @@ Vine.prototype.listen = function(port, address) {
 //
 // be done.
 //
-Vine.prototype.close = function(port) {
-
+Vine.prototype.clear = function() {
   clearInterval(this.heartbeatInterval);
   clearInterval(this.listInterval);
   clearInterval(this.hashInterval);
 
   clearTimers();
 
+};
+Vine.prototype.close = function() {
+
+  this.clear();
   this.server.close();
 
   return this;

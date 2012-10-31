@@ -15,12 +15,13 @@ SHash.prototype.dump = function() {
 };
 
 SHash.prototype.randomPair = function() {
-  
+
   var keys = Object.keys(this.data);
+
   var index = Math.floor(Math.random() * keys.length);
   var key = keys[index];
 
-  return [key, this.data[key].hash];
+  return keys.length > 0 && [key, this.data[key].hash];
 };
 
 //
@@ -32,7 +33,6 @@ SHash.prototype.interest = function(key, sha1) {
   return (typeof this.data[key] === 'undefined' ||
   (this.data[key] && this.data[key].hash !== sha1))
 };
-
 
 SHash.prototype.delete = function(key) {
   if (this.data[key]) {

@@ -15,7 +15,7 @@ var timers = {};
 var dataStore = SHash();
 var ballotbox = BallotBox();
 
-var clearTimers = function() { // on exit, kill all timers.
+var clearTimers = function() {
 
   for(var timer in timers) {
     clearTimeout(timers[timer].timer);
@@ -88,7 +88,7 @@ var Vine = module.exports = function Vine(opts, callback) {
       // we can have a conversation if
       // the need arises.
       //
-      that.receive(data, socket);
+      that.write(data, socket);
     });
   });
 
@@ -122,9 +122,9 @@ var Vine = module.exports = function Vine(opts, callback) {
 util.inherits(Vine, EventEmitter);
 
 //
-// receive a message from a peer.
+// write a message from a peer.
 //
-Vine.prototype.receive = function(msg, socket) {
+Vine.prototype.write = function(msg, socket) {
 
   var that = this;
 
@@ -137,13 +137,20 @@ Vine.prototype.receive = function(msg, socket) {
 
   that.emit('data', msg, socket);
 
+  //
+  // not a message we understand.
+  //
   if (!msg.meta && !msg.meta.type && !msg.data) {
-    return false; // not a message we understand.
+    return false; 
   }
 
-  that.emit(msg.meta.type, msg.data, socket);
+  //
+  // process message data
+  //
+  var type = msg.meta.type;
+  that.emit(type, msg.data, socket);
 
-  if (msg.meta.type === 'gossip') {
+  if (type === 'gossip') {
 
     var key = msg.data[0];
     var hash = msg.data[1];
@@ -152,7 +159,7 @@ Vine.prototype.receive = function(msg, socket) {
 
       socket.write({ // send a message back to the socket.
         meta: {
-          type: 'request'
+          type: 'gossip-request'
         },
         data: msg.data
       });
@@ -167,7 +174,7 @@ Vine.prototype.receive = function(msg, socket) {
       socket.end();
     }
   }
-  else if (msg.meta.type === 'request') {
+  else if (type === 'gossip-request') {
 
     //
     // there has been a request for a value,
@@ -178,7 +185,7 @@ Vine.prototype.receive = function(msg, socket) {
 
     socket.write({ // send a message to the socket with the value in it.
       meta: {
-        type: 'response'
+        type: 'gossip-response'
       },
       data: {
         key: key,
@@ -186,50 +193,72 @@ Vine.prototype.receive = function(msg, socket) {
       }
     });
   }
-  else if (msg.meta.type === 'response') {
+  else if (type === 'gossip-response') {
 
-    dataStore.setUnique(msg.data.key, msg.data.value);
     socket.end();
+    dataStore.setUnique(msg.data.key, msg.data.value);
   }
-  else if (msg.meta.type === 'votes') {
+  else if (type === 'quorum') {
 
     var data = msg.data;
+    var topic = data.topic;
 
     //
-    // first of all, does this peer care about this election?
+    // merge or create the election
     //
-    if (ballotbox.elections[data.topic]) {
+    var election = ballotbox.merge(this.details.uuid, topic, data);
+
+    if (election.result === null) {
 
       //
-      // we do care about this election, merge in the new votes.
+      // we have not yet come to a quorum, we should end this
+      // socket and send the votes to another random peer.
       //
-      ballotbox.merge(this.details.uuid, data.topic, data);
+      this.send('quorum', ballotbox.elections[topic]);
+    }
+    else {
 
-      if (!ballotbox.decide(this.details.uuid, data.topic)) {
+      var origin = this.peers[election.origin];
 
-        //
-        // we have not yet come to a quorum, we should end this
-        // socket and send the votes to another random peer.
-        //
-        this.send('votes', ballotbox.elections[data.topic]);
-      }
-      else {
-
-        //
-        // success! let the user know we have a quorum and that
-        // the reults are in (the election will be closed).
-        //
-        this.emit(
-          'quorum', 
-          data.topic, 
-          ballotbox.elections[data.topic],
-          ballotbox.results[data.topic]
-        );
+      if (origin) {
+        this.send('quorum-request', topic, origin.port, origin.address);
       }
     }
+
     socket.end();
   }
-  else if (msg.meta.type === 'list') { // handle merging the lists
+  else if (type === 'quorum-request') {
+    
+    var topic = msg.data;
+    var election = ballotbox.elections[topic];
+
+    //
+    // if there is a request for the election, that means that
+    // a peer thinks it has reached quorum. If the election is
+    // not closed, we can close it and return the election data.
+    //
+    if (election.expired === false && election.closed === false) {
+
+      election.closed = true;
+
+      socket.write({
+        meta: {
+          type: 'quorum-response',
+        },
+        data: election
+      });
+    }
+  }
+  else if (type === 'quorum-response') {
+
+    socket.end();
+
+    this.emit(
+      'quorum',
+      msg.data
+    );
+  }
+  else if (type === 'list') {
 
     var peers = msg.data; // the message data is a list of peers.
 
@@ -371,28 +400,40 @@ Vine.prototype.vote = function(topic, value) {
   // we have reached a quorum, if not then send off the
   // votes that we know about to the next random peer.
   //
-  var result = ballotbox.vote(this.details.uuid, topic, value);
+  var election = ballotbox.vote(this.details.uuid, topic, value);
 
-  if (result.closed) {
+  if (election.closed) {
 
-    var event = result.expired ? 'expire' : 'quorum';
+    if (election.expired) {
+      this.emit(
+        'expire',
+        election
+      );
+    }
+    else if (election.result !== null) {
 
-    //
-    // TODO: workflow does not end here. need to contact the
-    // origin; the election must still be open, if it is,
-    // close it, if we can do this then we can emit quorum.
-    //
+      //
+      // if this election is not closed or expired,
+      // and it has a result, we should attempt to
+      // request quorum.
+      //
+      var origin = this.peers[result.origin];
 
-    return this.emit(
-      event,
-      topic,
-      ballotbox.elections[topic]
-    );
+      if (origin) {
+        this.send(
+          'quorum-request', 
+          topic,
+          origin.port, 
+          origin.address
+        );
+      }
+    }
   }
   else {
 
-    return this.send('votes', ballotbox.elections[topic]);
+    this.send('quorum', election);
   }
+  return this;
 };
 
 Vine.prototype.election = function(opts) {

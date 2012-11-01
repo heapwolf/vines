@@ -78,18 +78,22 @@ BallotBox.prototype.merge = function(uuid, topic, data) {
 
   var election = this.elections[topic];
 
+  if (!election) {
+    election = this.elections[topic] = data;
+  }
+
   //
   // you cant merge votes for elections that is closed
   //
   if (election.closed) {
-    return false;
+    return election;
   }
 
   //
   // if the new ctime is earlier, we should merge
   // election info with the info in this data.
   //
-  var thisCTime = new Date(selection.ctime);
+  var thisCTime = new Date(election.ctime);
   var thatCTime = new Date(data.ctime);
   
   if (thatCTime < thisCTime) {
@@ -139,14 +143,14 @@ BallotBox.prototype.merge = function(uuid, topic, data) {
 //
 BallotBox.prototype.decide = function(uuid, topic) {
 
+  var election = this.elections[topic];
+
   //
   // if a decision has already been made, return false.
   //
-  if (this.elections[topic].closed) {
-    return this.elections[topic];
+  if (election.closed || election.expired) {
+    return election;
   }
-
-  var election = this.elections[topic];
 
   var total = election.total;
   var min = election.min;
@@ -182,7 +186,7 @@ BallotBox.prototype.decide = function(uuid, topic) {
   if (V >= total) {
 
     if (Vc === Va) {
-      return this.elections[topic];
+      return election;
     }
 
     var minimum = Vc >= min || Va >= min;
@@ -195,7 +199,6 @@ BallotBox.prototype.decide = function(uuid, topic) {
     //
     if (minimum) {
 
-      election.closed = true;
       election.result = Vc > Va;
       election.owner = uuid;
 
@@ -203,7 +206,7 @@ BallotBox.prototype.decide = function(uuid, topic) {
     }
   }
 
-  return this.elections[topic];
+  return election;
 };
 
 //
@@ -229,6 +232,8 @@ BallotBox.prototype.election = function(opts) {
   // communicate with each other. min should be the minumum
   //
   this.elections[opts.topic] = {
+
+    topic: opts.topic,
 
     min: opts.min || null,
     total: opts.total || null,

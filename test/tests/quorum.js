@@ -21,16 +21,15 @@ module.exports = {
       total: 3 // in the real world, this would be discovered dynamically
     }
 
-    var onQuorum = function(topic, election) {
+    var onQuorum = function(election) {
 
-      if (topic === 'a') {
+      if (election.topic === 'a') {
 
         vine1.close()
         vine2.close()
         vine3.close()
 
-        test.equal(topic, 'a', 'quorum has been reached')
-
+        test.equal(election.topic, 'a', 'quorum has been reached')
       }
     }
 
@@ -71,25 +70,25 @@ module.exports = {
     var electionCriteria = {
       topic: 'b',
       expire: 60,
-      min: Math.floor(Object.keys(vines).length/1.5),
-      total: Object.keys(vines).length
+      min: 4,
+      total: 5
     }
 
-    var onQuorum = function(key, data) {
+    var onQuorum = function(election) {
 
-      if (key === 'b') {
+      if (election.topic === 'b') {
 
-        test.fail(key, 'b', 'Should not reach quorum')
+        test.fail(election.topic, 'b', 'Should not reach quorum')
 
       }
     }
 
-    var onExpire = function(key, data) {
+    var onExpire = function(election) {
 
-      if (key === 'b' && expired === false) {
+      if (election.topic === 'b' && expired === false) {
         
         expired = true;
-        test.equal(key, 'b', 'Should emit the expire event')
+        test.ok(true, 'Should emit the expire event')
 
         //
         // close all of the open servers

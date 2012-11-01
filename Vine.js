@@ -1,6 +1,5 @@
-
 var net = require('net');
-var EventEmitter = require('events').EventEmitter;
+var Stream = require("stream").Stream;
 var util = require('util');
 
 var uuid = require('node-uuid'); // we need unique IDs.
@@ -62,7 +61,7 @@ var Vine = module.exports = function Vine(opts, callback) {
     return new Vine(opts, callback);
   }
 
-  EventEmitter.call(this);
+  Stream.call(this);
 
   if(!arguments[1]) {
     callback = opts;
@@ -118,7 +117,7 @@ var Vine = module.exports = function Vine(opts, callback) {
   this.peers[id] = this.details;
 };
 
-util.inherits(Vine, EventEmitter);
+util.inherits(Vine, Stream);
 
 //
 // write a message from a peer.

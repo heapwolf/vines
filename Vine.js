@@ -6,7 +6,6 @@ var util = require('util');
 var uuid = require('node-uuid'); // we need unique IDs.
 
 var ip = require('./common/ip'); // for discovering the external IP address
-var diff = require('./common/diff'); // not used yet.
 var SHash = require('./common/SHash'); // A special collection type
 var BallotBox = require('./common/BallotBox'); // for voting
 

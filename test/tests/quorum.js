@@ -108,6 +108,7 @@ module.exports = {
 
     vines.vine2 = Vine()
       .listen(8009)
+      .election(electionCriteria)
       .join(8008)
       .on('expire', onExpire)
       .on('quorum', onQuorum)
@@ -115,6 +116,7 @@ module.exports = {
 
     vines.vine3 = Vine()
       .listen(8010)
+      .election(electionCriteria)
       .join(8008)
       .on('expire', onExpire)
       .on('quorum', onQuorum)
@@ -122,6 +124,7 @@ module.exports = {
 
     vines.vine4 = Vine()
       .listen(8011)
+      .election(electionCriteria)
       .join(8009)
       .on('expire', onExpire)
       .on('quorum', onQuorum)
@@ -129,6 +132,7 @@ module.exports = {
 
     vines.vine5 = Vine()
       .listen(8012)
+      .election(electionCriteria)
       .join(8009)
       .on('expire', onExpire)
       .on('quorum', onQuorum)

@@ -1,67 +1,72 @@
 
 var crypto = require('crypto');
 
-var SHash = module.exports = function SHash(data, hashes) {
+var SHash = module.exports = function SHash() {
 
   if(!(this instanceof SHash)) {
-    return new SHash(data, hashes);
+    return new SHash();
   }
 
-  this.data = data || {};
-};
-
-SHash.prototype.dump = function() {
-  return this.data;
+  this.data = {};
+  this.meta = {};
 };
 
 SHash.prototype.randomPair = function() {
 
-  var keys = Object.keys(this.data);
+  var keys = Object.keys(this.meta);
 
   var index = Math.floor(Math.random() * keys.length);
   var key = keys[index];
 
-  return keys.length > 0 && [key, this.data[key].hash];
+  return keys.length > 0 && [key, this.meta[key].hash];
 };
 
 //
 // if the key does not exist at all, we want it,
 // also if the key exists and the hash is different.
 //
-SHash.prototype.interest = function(key, sha1) {
+SHash.prototype.interest = function(key, sha1, ctime) {
 
-  return (typeof this.data[key] === 'undefined' ||
-  (this.data[key] && this.data[key].hash !== sha1))
+  var meta = this.meta[key];
+
+  var thisCTime = new Date(meta.ctime);
+  var thatCTime = new Date(ctime);
+
+  return (typeof meta === 'undefined' ||
+    (meta && meta.hash !== sha1) ||
+    (thisCTime > thatCTime));
 };
 
 SHash.prototype.delete = function(key) {
-  if (this.data[key]) {
-    this.data[key] = {};
+
+  if (this.meta[key] && this.data[key]) {
+    delete this.data[key];
+    delete this.meta[key];
     return true;
   }
-  
+
   return false;
 };
 
 SHash.prototype.get = function(key) {
 
-  return this.data[key].value;
-};
-
-SHash.prototype.getHash = function() {
-  return this.data[key].hash;
+  return this.data[key];
 };
 
 SHash.prototype.set = function(key, value) {
 
   var shasum = crypto.createHash('sha1');
   shasum.update(value);
+
   var hash = shasum.digest('hex');
 
-  if(!this.data[key]) {
-    this.data[key] = {};
+  if(!this.meta[key]) {
+    this.meta[key] = {};
   }
 
-  this.data[key].value = value;
-  return this.data[key].hash = hash;
+  this.data[key] = value;
+  this.meta[key].ctime = String(new Date(Date.now()));
+  this.meta[key].hash = hash;
+
+  return hash;
 };

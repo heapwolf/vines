@@ -141,36 +141,39 @@ Vine.prototype.write = function(msg, socket) {
   // not a message we understand.
   //
   if (!msg.meta && !msg.meta.type && !msg.data) {
-    return false; 
+    return false;
   }
 
   //
   // process message data
   //
   var type = msg.meta.type;
-  that.emit(type, msg.data, socket);
+  var data = msg.data;
+
+  that.emit(type, data, socket);
 
   if (type === 'gossip') {
 
-    var key = msg.data[0];
-    var hash = msg.data[1];
-    
-    if (dataStore.interest(key, hash)) {  // its new, we want it.
+    var delta = [];
 
-      socket.write({ // send a message back to the socket.
+    for (var key in data) {
+
+      if (dataStore.interest(key, data[key].hash, data[key].ctime)) {
+        delta.push(key);
+      }
+    }
+
+    if (delta > 0) {
+
+      socket.write({
         meta: {
           type: 'gossip-request'
         },
-        data: msg.data
+        data: delta
       });
-    }
-    else { // we already know about this.
 
-      //
-      // we can end the conversation now. Although, to
-      // comply with the gossip protocol, we should actually
-      // cycle until we find something that is an update.
-      //
+    }
+    else {
       socket.end();
     }
   }
@@ -180,23 +183,26 @@ Vine.prototype.write = function(msg, socket) {
     // there has been a request for a value,
     // in this case we can be sure its wanted.
     //
-    var key = msg.data[0];
-    var hash = msg.data[1];
+    var delta = {};
 
-    socket.write({ // send a message to the socket with the value in it.
+    for (var i = 0, l = data.length; i > l; i++) {
+      delta[data[i]] = dataStore[data[i]].value;
+    }
+
+    socket.write({
       meta: {
         type: 'gossip-response'
       },
-      data: {
-        key: key,
-        value: dataStore.get(key)
-      }
+      data: delta
     });
   }
   else if (type === 'gossip-response') {
 
     socket.end();
-    dataStore.setUnique(msg.data.key, msg.data.value);
+
+    for (var key in data) {
+      dataStore.set(key, data[key]);
+    }
   }
   else if (type === 'quorum') {
 
@@ -228,7 +234,7 @@ Vine.prototype.write = function(msg, socket) {
     socket.end();
   }
   else if (type === 'quorum-request') {
-    
+
     var topic = msg.data;
     var election = ballotbox.elections[topic];
 
@@ -469,10 +475,13 @@ Vine.prototype.listen = function(port, address) {
     }, that.details.listInterval);
 
     //
-    // we want to send off a random pair at an interval.
+    // gossip the meta data about the data we have.
+    // if a peer is interested they will supply us
+    // with a delta of keys and we can return the
+    // corresponding values for those keys.
     //
     that.hashInterval = setInterval(function() {
-      that.send('gossip', dataStore.randomPair());
+      that.send('gossip', dataStore.meta);
     }, that.details.hashInterval);
 
     //

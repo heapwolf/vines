@@ -1,18 +1,17 @@
 
-# What are distributed systems
+A distributed system has many discrete processes that run on a multitude of
+arbitrary devices and networks yet to the user it appears to be a single,
+coherent program. Distributed systems can provide availability and fault
+tolerance.
 
-A collection of independent processes running on an any computers running 
-programs that appear to as a single coherent program.
+Distribution requires data replication but fault-tolerance and exact 
+consistency are simply not incompatable.
 
-## Charactarizations
+Eventual consistency allows peers who wish to replicate an opportunity to 
+update regardless of the state of synchronization.
 
-- The programs that run on the independent computers are autonomous.
-- There is continuous availability. When parts are temporarily unavailable, 
-new or in flux, consumers of the system shouldn't notice.
-- Implementation is limited to the distribution of peer information and data
-structures in order to support heterogeneous computers and networks.
-- Encapsulates the fact that its processes and resources are physically 
-distributed across multiple computers.
+This implementation is limited to the distribution of peer information and 
+data structures in order to support heterogeneous computers and networks.
 
 
 # What is the Gossip Protocol

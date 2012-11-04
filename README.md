@@ -29,14 +29,22 @@ when then peers were connected or when the data was entered.
   vine
     .listen(8000)
     .join(8000, '192.168.0.2')
-    .on('data', 'foo', function(value) {
+    .on('gossip', 'foo', function(value) {
       console.log(value);
     })
 ```
 
-A computer at `192.168.0.2` can call an election.
+A computer at `192.168.0.2` can call an election and cast a vote.
 
 ```js
+
+  var electionCriteria = {
+    topic: 'a',
+    expire: String(new Date(now.setMinutes(now.getMinutes() + 5))),
+    min: 2,
+    total: 2
+  }
+
   var vine = Vine()
 
   vine
@@ -44,6 +52,7 @@ A computer at `192.168.0.2` can call an election.
     .on('quorum', onQuorum)
     .on('expire', onExpire)
     .election(electionCriteria)
+    .vote('email', true)
 ```
 
 A computer at `192.168.0.3` can also call an election however only one
@@ -58,6 +67,7 @@ of the peers will be able to execute the callback for the `quorum` event.
     .on('quorum', onQuorum)
     .on('expire', onExpire)
     .election(electionCriteria)
+    .vote('email', true)
 ```
 
 [0]:http://www.oracle.com/technetwork/products/nosqldb/documentation/consistency-explained-1659908.pdf

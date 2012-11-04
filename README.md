@@ -10,18 +10,18 @@ Vines attempts to facilitate data replication and coordinated decision
 making through a combination of [eventual consistency][0] and 
 [quorum-based concensus][1].
 
-
-A computer at `192.168.0.2`
+A computer at `192.168.0.2` can generate some information.
 
 ```js
   var vine = Vine()
 
   vine
     .listen(8000)
-    .set('foo', 'hello, world')
+    .gossip('foo', 'hello, world')
 ```
 
-A computer at `192.168.0.3`
+A computer at `192.168.0.3` can discover that information regardless of
+when then peers were connected or when the data was entered.
 
 ```js
   var vine = Vine()
@@ -29,7 +29,35 @@ A computer at `192.168.0.3`
   vine
     .listen(8000)
     .join(8000, '192.168.0.2')
-    .on('data', 'foo')
+    .on('data', 'foo', function(value) {
+      console.log(value);
+    })
+```
+
+A computer at `192.168.0.2` can call an election.
+
+```js
+  var vine = Vine()
+
+  vine
+    .listen(8000)
+    .on('quorum', onQuorum)
+    .on('expire', onExpire)
+    .election(electionCriteria)
+```
+
+A computer at `192.168.0.3` can also call an election however only one
+of the peers will be able to execute the callback for the `quorum` event.
+
+```js
+  var vine = Vine()
+
+  vine
+    .listen(8000)
+    .join(8000, '192.168.0.2')
+    .on('quorum', onQuorum)
+    .on('expire', onExpire)
+    .election(electionCriteria)
 ```
 
 [0]:http://www.oracle.com/technetwork/products/nosqldb/documentation/consistency-explained-1659908.pdf

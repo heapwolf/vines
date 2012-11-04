@@ -1,16 +1,13 @@
-
-[Node Vines](https://raw.github.com/hij1nx/vines/master/node-vines.png)
-
-# Vines
+![Node Vines](https://raw.github.com/hij1nx/vines/master/node-vines.png)
 
 A distributed system has many discrete processes that run on a multitude of
 arbitrary devices and networks yet to the user it appears to be a single
 coherent program. Distributed systems can help to provide availability and 
 fault tolerance.
 
-Since fault-tolerance and absolute consistency are not exactly compatable, 
-`vines` attempts to make data replication and coordinated decision making 
-through a combination of [eventual consistency][0] and 
+Since fault-tolerance and strong consistency are not exactly compatable, 
+Vines attempts to facilitate data replication and coordinated decision 
+making through a combination of [eventual consistency][0] and 
 [quorum-based concensus][1].
 
 

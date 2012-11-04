@@ -11,7 +11,7 @@ Eventual consistency allows peers who wish to replicate an opportunity to
 update regardless of the state of synchronization.
 
 This implementation is limited to the distribution of peer information and 
-data structures in order to support heterogeneous computers and networks.
+data structures in order to support heterogeneous infrastructure.
 
 
 # What is the Gossip Protocol

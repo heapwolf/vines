@@ -25,16 +25,18 @@ SHash.prototype.randomPair = function() {
 // if the key does not exist at all, we want it,
 // also if the key exists and the hash is different.
 //
-SHash.prototype.interest = function(key, sha1, ctime) {
+SHash.prototype.interest = function(key, hash, ctime) {
 
   var meta = this.meta[key];
+
+  if (typeof meta === 'undefined') {
+    return true;
+  }
 
   var thisCTime = new Date(meta.ctime);
   var thatCTime = new Date(ctime);
 
-  return (typeof meta === 'undefined' ||
-    (meta && meta.hash !== sha1) ||
-    (thisCTime > thatCTime));
+  return (meta.hash !== hash) && (thisCTime > thatCTime);
 };
 
 SHash.prototype.delete = function(key) {

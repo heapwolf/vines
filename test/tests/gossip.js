@@ -15,8 +15,8 @@ module.exports = {
     vine1.on('list', function(data) {
 
       test.ok(data, 'got the list')
-      vine1.close()
-      vine2.close()
+      vine1.end()
+      vine2.end()
     })
 
     vine2 = Vine().listen(8002).join(8001)
@@ -31,18 +31,25 @@ module.exports = {
     var vine2
 
     vine1 = Vine().listen(8003)
-
-    vine1.set('foo', 'hello, world')
-
     vine2 = Vine().listen(8004).join(8003)
+
+    vine2.on('gossip', function(key, data) {
+
+      //need to get this from an emit
+      if (key === 'foo') {
+
+        test.ok(data, 'got the gossip with the correct key')
+
+        vine1.end()
+        vine2.end()
+      }
+
+    })
 
     setTimeout(function() {
 
-      //need to get this from an emit
-      test.equal('hello, world', vine2.get('foo'))
-      vine1.close()
-      vine2.close()
-
-    }, 4000);
+      vine1.gossip('foo', 'hello, world') 
+    }, 1000)
+      
   }
 };

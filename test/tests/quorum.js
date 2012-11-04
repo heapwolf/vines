@@ -4,147 +4,129 @@ var Vine = require('../../vine')
 
 module.exports = {
 
-  "A peer should commit to an action after a quorum is reached": function(test) {
-
+  "Create an instance of a peer": function(test) {
+    
     test.plan(1)
 
-    var vine1
-    var vine2
-    var vine3
+    var v1 = Vine().listen(8000)
+
+    setTimeout(function() {
+      v1.end()
+      test.ok(true, 'done')
+    }, 500)
+
+  },
+
+  "Create two instances of a peer": function(test) {
+    
+    test.plan(1)
+
+    var v1 = Vine().listen(7001)
+    var v2 = Vine().listen(7002)
+
+    setTimeout(function() {
+      v1.end()
+      v2.end()
+      test.ok(true, 'done')
+    }, 500)
+
+  },
+
+  "Connect two peers that will initiate an election": function(test) {
+    
+    test.plan(1)
+
+    var v1 = Vine().listen(7003)
+    var v2 = Vine().listen(7004).join(7003)
 
     var now = new Date(Date.now())
-
-    var electionCriteria = {
-      topic: 'a',
-      expire: String(new Date(now.setMinutes(now.getMinutes() + 1))),
-      min: 2, // in the real world, this would be a percentage of the total
-      total: 3 // in the real world, this would be discovered dynamically
-    }
 
     var onQuorum = function(election) {
 
       if (election.topic === 'a') {
 
-        vine1.close()
-        vine2.close()
-        vine3.close()
+        v1.end()
+        v2.end()
 
-        test.equal(election.topic, 'a', 'quorum has been reached')
+        test.equal(
+          election.topic, 
+          'a', 
+          'quorum has been reached, executed by only one peer'
+        )
       }
     }
 
-    vine1 = Vine()
-      .listen(8005)
-      .election(electionCriteria)
-      .on('quorum', onQuorum)
-    ;
+    var electionCriteria = {
+      topic: 'a',
+      expire: String(new Date(now.setMinutes(now.getMinutes() + 5))),
+      min: 2,
+      total: 2
+    }
 
-    vine2 = Vine()
-      .listen(8006)
-      .join(8005)
-      .election(electionCriteria)
-      .on('quorum', onQuorum)
-    ;
+    v1.on('quorum', onQuorum).election(electionCriteria)
+    v2.on('quorum', onQuorum).election(electionCriteria)
 
-    vine3 = Vine()
-      .listen(8007)
-      .join(8005)
-      .election(electionCriteria)
-      .on('quorum', onQuorum)
-    ;
+    setTimeout(function() {
+      v1.vote('a', true);
+    }, 300)
 
-    setTimeout(function() { vine1.vote('a', true) }, 100)
-    setTimeout(function() { vine2.vote('a', true) }, 200)
-    setTimeout(function() { vine3.vote('a', true) }, 300)
+    setTimeout(function() {
+      v2.vote('a', true);
+    }, 800)    
+
   },
 
-  "An expired election should never reach quorum": function(test) {
-
+  "An election should expire": function(test) {
+    
     test.plan(1)
 
-    var vines = {}
-    var expired = false
+    var v1 = Vine().listen(7003)
+    var v2 = Vine().listen(7004).join(7003)
 
     var now = new Date(Date.now())
-
-    var electionCriteria = {
-      topic: 'b',
-      expire: 60,
-      min: 4,
-      total: 5
-    }
+    var counter = 0;
 
     var onQuorum = function(election) {
 
-      if (election.topic === 'b') {
-
-        test.fail(election.topic, 'b', 'Should not reach quorum')
-
-      }
     }
 
     var onExpire = function(election) {
 
-      if (election.topic === 'b' && expired === false) {
-        
-        expired = true;
-        test.ok(true, 'Should emit the expire event')
+      ++counter;
 
-        //
-        // close all of the open servers
-        //
-        Object.keys(vines).forEach(function(key) {
-          vines[key].close()
-        })
+      if (election.topic === 'a' && counter === 2) {
+
+        v1.end()
+        v2.end()
+
+        test.ok(true, 'Should emit the expire event')
       }
     }
 
-    vines.vine1 = Vine()
-      .listen(8008)
-      .election(electionCriteria)
-      .on('expire', onExpire)
+    var electionCriteria = {
+      topic: 'a',
+      expire: String(new Date(now.setMinutes(now.getMinutes() + .1))),
+      min: 2,
+      total: 2
+    }
+
+    v1
       .on('quorum', onQuorum)
-    ;
-
-    vines.vine2 = Vine()
-      .listen(8009)
-      .election(electionCriteria)
-      .join(8008)
       .on('expire', onExpire)
-      .on('quorum', onQuorum)
-    ;
-
-    vines.vine3 = Vine()
-      .listen(8010)
       .election(electionCriteria)
-      .join(8008)
-      .on('expire', onExpire)
-      .on('quorum', onQuorum)
-    ;
 
-    vines.vine4 = Vine()
-      .listen(8011)
+    v2
+      .on('quorum', onQuorum)
+      .on('expire', onExpire)
       .election(electionCriteria)
-      .join(8009)
-      .on('expire', onExpire)
-      .on('quorum', onQuorum)
-    ;
 
-    vines.vine5 = Vine()
-      .listen(8012)
-      .election(electionCriteria)
-      .join(8009)
-      .on('expire', onExpire)
-      .on('quorum', onQuorum)
-    ;
+    setTimeout(function() {
+      v1.vote('a', true);
+    }, 300)
 
-    Object.keys(vines).forEach(function(key) {
-
-      setTimeout(
-        function() { vines[key].vote('b', true) },
-        Math.floor(Math.random() * 100)
-      )
-    })
+    setTimeout(function() {
+      v2.vote('a', true);
+    }, 800)    
 
   }
 }

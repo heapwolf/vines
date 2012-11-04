@@ -10,24 +10,6 @@ var BallotBox = require('./common/BallotBox'); // for voting
 
 var timers = {};
 
-var dataStore = SHash();
-var ballotbox = BallotBox();
-
-var clearTimers = function() {
-
-  for(var timer in timers) {
-    clearTimeout(timers[timer].timer);
-    delete timers[timer];
-  }
-};
-
-//
-// a timer is used to keep track of how long its been 
-// since we've heard from a peer. If the timer runs out
-// we stop trying to broadcast to that peer by marking
-// it as dead. If we hear from it again, it gets marked
-// as alive.
-//
 var Timer = function Timer(timeout, uuid, callback) {
 
   if(!(this instanceof Timer)) {
@@ -55,6 +37,14 @@ Timer.prototype.reset = function() {
   this.start();
 };
 
+//
+// a timer is used to keep track of how long its been 
+// since we've heard from a peer. If the timer runs out
+// we stop trying to broadcast to that peer by marking
+// it as dead. If we hear from it again, it gets marked
+// as alive.
+//
+
 var Vine = module.exports = function Vine(opts, callback) {
 
   if(!(this instanceof Vine)) {
@@ -70,22 +60,15 @@ var Vine = module.exports = function Vine(opts, callback) {
 
   var that = this;
 
+  this.dataStore = SHash();
+  this.ballotbox = BallotBox();
+
   this.peers = opts.peers || {};
   this.defaultTimeout = opts.timeout || 1e4;
 
   var server = this.server = net.createServer(function(socket) {
 
-    //
-    // when we get data, decide if 
-    // we are interested in it or not.
-    //
     socket.on('data', function(data) {
-
-      //
-      // we pass in the socket so that 
-      // we can have a conversation if
-      // the need arises.
-      //
       that.write(data, socket);
     });
   });
@@ -107,8 +90,8 @@ var Vine = module.exports = function Vine(opts, callback) {
     lifetime: 0,
     timeout: this.defaultTimeout,
     heartbeatInterval: opts.heartbeatInterval || 100,
-    listInterval: opts.listInterval || 300,
-    hashInterval: opts.hashInterval || 300
+    listInterval: opts.listInterval || 500,
+    hashInterval: opts.hashInterval || 500
   };
 
   //
@@ -148,61 +131,52 @@ Vine.prototype.write = function(msg, socket) {
   var type = msg.meta.type;
   var data = msg.data;
 
-  that.emit(type, data, socket);
-
   if (type === 'gossip') {
 
     var delta = [];
 
     for (var key in data) {
 
-      if (dataStore.interest(key, data[key].hash, data[key].ctime)) {
+      if (this.dataStore.interest(key, data[key].hash, data[key].ctime)) {
         delta.push(key);
       }
     }
 
-    if (delta > 0) {
-
-      socket.write({
-        meta: {
-          type: 'gossip-request'
-        },
-        data: delta
-      });
-
+    if (delta.length > 0) {
+      this.send('gossip-request', delta, socket);
     }
     else {
       socket.end();
     }
   }
   else if (type === 'gossip-request') {
-
     //
     // there has been a request for a value,
     // in this case we can be sure its wanted.
     //
     var delta = {};
+    var key = '';
 
-    for (var i = 0, l = data.length; i > l; i++) {
-      delta[data[i]] = dataStore[data[i]].value;
+    for (var i=0, l=data.length; i < l; i++) {
+      key = data[i];
+      delta[key] = this.dataStore.get(key);
     }
-
-    socket.write({
-      meta: {
-        type: 'gossip-response'
-      },
-      data: delta
-    });
+    
+    this.send('gossip-response', delta, socket);
   }
   else if (type === 'gossip-response') {
 
     socket.end();
 
     for (var key in data) {
-      dataStore.set(key, data[key]);
+
+      this.dataStore.set(key, data[key]);
+      that.emit('gossip', key, data[key]);
     }
-  }
+  }         
   else if (type === 'quorum') {
+
+    socket.end();
 
     var data = msg.data;
     var topic = data.topic;
@@ -210,7 +184,7 @@ Vine.prototype.write = function(msg, socket) {
     //
     // merge or create the election
     //
-    var election = ballotbox.merge(this.details.uuid, topic, data);
+    var election = this.ballotbox.merge(this.details.uuid, topic, data);
 
     if (election.result === null) {
 
@@ -218,23 +192,22 @@ Vine.prototype.write = function(msg, socket) {
       // we have not yet come to a quorum, we should end this
       // socket and send the votes to another random peer.
       //
-      this.send('quorum', ballotbox.elections[topic]);
+      this.send('quorum', this.ballotbox.elections[topic]);
     }
     else {
 
       var origin = this.peers[election.origin];
 
       if (origin) {
+
         this.send('quorum-request', topic, origin.port, origin.address);
       }
     }
-
-    socket.end();
   }
   else if (type === 'quorum-request') {
 
     var topic = msg.data;
-    var election = ballotbox.elections[topic];
+    var election = this.ballotbox.elections[topic];
 
     //
     // if there is a request for the election, that means that
@@ -245,30 +218,24 @@ Vine.prototype.write = function(msg, socket) {
 
       election.closed = true;
 
-      socket.write({
-        meta: {
-          type: 'quorum-response',
-        },
-        data: election
-      });
+      this.send('quorum-response', election, socket);
     }
   }
   else if (type === 'quorum-response') {
 
     socket.end();
-
-    this.emit(
-      'quorum',
-      msg.data
-    );
+    this.emit('quorum', msg.data);
   }
   else if (type === 'list') {
 
-    var peers = msg.data; // the message data is a list of peers.
+    that.emit(type, data, socket);
+    socket.end();
+
+    var peers = msg.data;
 
     for (peerId in peers) {
 
-      var knownPeer = that.peers[peerId]; // do we know this peer?
+      var knownPeer = that.peers[peerId];
 
       if (knownPeer) {
 
@@ -311,8 +278,6 @@ Vine.prototype.write = function(msg, socket) {
         timer.start();
       }
     }
-
-    socket.end(); // we got the list, no need to have a conversation.
   }
 
   return this;
@@ -321,16 +286,16 @@ Vine.prototype.write = function(msg, socket) {
 //
 // send a message to a random peer.
 //
-Vine.prototype.send = function(type, data, port, address) {
-
-  ++this.details.lifetime;
+Vine.prototype.send = function(type, data) {
 
   var that = this;
+  var port = arguments[2];
+  var address = arguments[3];
 
   //
   // get a random peer, or provide one
   // 
-  if (!address && !port) {
+  if (!arguments[2] && !arguments[3]) {
 
     var peer = this.randomPeer();
 
@@ -342,7 +307,7 @@ Vine.prototype.send = function(type, data, port, address) {
     port = peer.port;
 
   }
-  else if (!address) {
+  else if (!arguments[3]) {
     address = '127.0.0.1';
   }
 
@@ -354,9 +319,15 @@ Vine.prototype.send = function(type, data, port, address) {
     data: data
   };
 
-  that.emit('send', port, address, msg);
 
-  var message = new Buffer(JSON.stringify(msg));
+  var message = JSON.stringify(msg);
+
+  if (typeof arguments[2] === 'object') {
+
+    var socket = arguments[2];
+    socket.write(message);
+    return this;
+  }
 
   var client = net.connect({
     port: port, 
@@ -364,12 +335,14 @@ Vine.prototype.send = function(type, data, port, address) {
   });
 
   client.on('error', function(err) {
-    // do nothing
+    // do nothing for now.
+  })
+
+  client.on('data', function(data) {
+    that.write(data, client);
   })
 
   client.on('connect', function() {
-
-    that.emit('sent', port, address, msg);
     client.write(message);
   });
 
@@ -379,17 +352,9 @@ Vine.prototype.send = function(type, data, port, address) {
 //
 // set a local value on this peer.
 //
-Vine.prototype.set = function(key, val) {
+Vine.prototype.gossip = function(key, val) {
 
-  dataStore.set(key, val);
-};
-
-//
-// get a local value from this peer.
-//
-Vine.prototype.get = function(key) {
-
-  return dataStore.get(key);
+  this.dataStore.set(key, val);
 };
 
 //
@@ -404,7 +369,7 @@ Vine.prototype.vote = function(topic, value) {
   // we have reached a quorum, if not then send off the
   // votes that we know about to the next random peer.
   //
-  var election = ballotbox.vote(this.details.uuid, topic, value);
+  var election = this.ballotbox.vote(this.details.uuid, topic, value);
 
   if (election.closed) {
 
@@ -421,20 +386,19 @@ Vine.prototype.vote = function(topic, value) {
       // and it has a result, we should attempt to
       // request quorum.
       //
-      var origin = this.peers[result.origin];
+      var origin = this.peers[election.result.origin];
 
       if (origin) {
         this.send(
-          'quorum-request', 
+          'quorum-request',
           topic,
-          origin.port, 
+          origin.port,
           origin.address
         );
       }
     }
   }
   else {
-
     this.send('quorum', election);
   }
   return this;
@@ -448,7 +412,7 @@ Vine.prototype.election = function(opts) {
   //
   opts.origin = this.details.uuid;
 
-  ballotbox.election(opts);
+  this.ballotbox.election(opts);
   return this;
 };
 
@@ -469,7 +433,9 @@ Vine.prototype.listen = function(port, address) {
     // we want to send of the list at an interval.
     //
     that.listInterval = setInterval(function() {
-      that.send('list', that.peers);
+      if (Object.keys(that.peers).length > 0) {
+        that.send('list', that.peers);
+      }
     }, that.details.listInterval);
 
     //
@@ -479,7 +445,9 @@ Vine.prototype.listen = function(port, address) {
     // corresponding values for those keys.
     //
     that.hashInterval = setInterval(function() {
-      that.send('gossip', dataStore.meta);
+      if (Object.keys(that.dataStore.meta).length > 0) {
+        that.send('gossip', that.dataStore.meta);
+      }
     }, that.details.hashInterval);
 
     //
@@ -493,13 +461,16 @@ Vine.prototype.listen = function(port, address) {
   return this;
 };
 
-Vine.prototype.close = function() {
+Vine.prototype.end = function() {
 
   clearInterval(this.heartbeatInterval);
   clearInterval(this.listInterval);
   clearInterval(this.hashInterval);
 
-  clearTimers();
+  for(var timer in timers) {
+    clearTimeout(timers[timer].timer);
+    delete timers[timer];
+  }
 
   this.server.close();
 

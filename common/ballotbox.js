@@ -178,13 +178,12 @@ BallotBox.prototype.decide = function(uuid, topic) {
 
   var V = Vc + Va;
 
-  //
-  // ensure that a transaction cannot be committed and 
-  // aborted at the same time.
-  //
+  if (V >= min) {
 
-  if (V >= total) {
-
+    //
+    // ensure that a transaction cannot be committed and 
+    // aborted at the same time.
+    //
     if (Vc === Va) {
       return election;
     }

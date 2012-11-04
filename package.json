@@ -1,10 +1,10 @@
 {
   "name": "vines",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "an implementation of the gossip protocol with quorum-based voting machinery",
   "main": "index.js",
   "scripts": {
-    "test": "node test/test.js"
+    "test": "./test/test"
   },
   "repository": {
     "type": "git",

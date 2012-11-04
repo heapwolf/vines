@@ -39,7 +39,7 @@ A computer at `192.168.0.2` can call an election and cast a vote.
 ```js
 
   var electionCriteria = {
-    topic: 'a',
+    topic: 'email',
     expire: String(new Date(now.setMinutes(now.getMinutes() + 5))),
     min: 2,
     total: 2

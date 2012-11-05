@@ -32,7 +32,7 @@ module.exports = {
 
   },
 
-  "Connect two peers that will initiate an election": function(test) {
+  "Connect two peers that initiate elections": function(test) {
     
     test.plan(1)
 
@@ -106,7 +106,7 @@ module.exports = {
     var electionCriteria = {
       topic: 'a',
       expire: String(new Date(now.setMinutes(now.getMinutes() + .1))),
-      min: 2,
+      min: 2, 
       total: 2
     }
 

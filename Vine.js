@@ -10,26 +10,32 @@ var BallotBox = require('./common/BallotBox'); // for voting
 
 var timers = {};
 
-var Timer = function Timer(timeout, uuid, callback) {
+var Timer = function Timer(timeout, id, callback) {
 
   if(!(this instanceof Timer)) {
-    return timers[uuid] = new Timer(timeout, uuid, callback);
+    return timers[id] = new Timer(timeout, id, callback);
+  }
+
+  if (typeof id === 'function') {
+    callback = id;
+    id = uuid.v4();
   }
 
   this.callback = callback;
   this.timeout = timeout;
-  this.uuid = uuid;
+  this.id = id;
   this.timer = null;
 };
 
 Timer.prototype.start = function() {
-  
-  this.timer = setTimeout(this.callback, this.timeout);
+  if (this.callback) {
+    this.timer = setTimeout(this.callback, this.timeout);
+  }
 };
 
 Timer.prototype.stop = function() {
   clearTimeout(this.timer);
-  delete timers[this.uuid];
+  delete timers[this.id];
 };
 
 Timer.prototype.reset = function() {
@@ -92,6 +98,12 @@ var Vine = module.exports = function Vine(opts, callback) {
     heartbeatInterval: opts.heartbeatInterval || 100,
     listInterval: opts.listInterval || 500,
     hashInterval: opts.hashInterval || 500
+  };
+
+  this.reconnect = {
+
+    max: opts.retries || 10,
+    interval: opts.interval || 5000
   };
 
   //
@@ -319,7 +331,6 @@ Vine.prototype.send = function(type, data) {
     data: data
   };
 
-
   var message = JSON.stringify(msg);
 
   if (typeof arguments[2] === 'object') {
@@ -329,22 +340,43 @@ Vine.prototype.send = function(type, data) {
     return this;
   }
 
-  var client = net.connect({
-    port: port, 
-    host: address 
-  });
+  var attempts = 0;
+  var reconnect = null;
 
-  client.on('error', function(err) {
-    // do nothing for now.
-  })
+  var connect = function() {
 
-  client.on('data', function(data) {
-    that.write(data, client);
-  })
+    var client = net.connect({
+      port: port,
+      host: address
+    });
 
-  client.on('connect', function() {
-    client.write(message);
-  });
+    client.on('error', function(err) {
+
+      if (attempts === 0) {
+        reconnect = setInterval(connect, that.reconnect.interval);
+      }
+
+      ++attempts;
+
+      if (attempts >= that.reconnect.max) {
+        clearInterval(reconnect);
+      }
+    });
+
+    client.on('data', function(data) {
+      that.write(data, client);
+    });
+
+    client.on('connect', function() {
+
+      if (reconnect) {
+        clearInterval(reconnect);
+      }
+      client.write(message);
+    });
+  };
+
+  connect();
 
   return this;
 };

@@ -1,6 +1,6 @@
 
 var test = require('tap').test
-var Vine = require('../../vine')
+var Vine = require('../../index')
 
 module.exports = {
 

@@ -317,6 +317,7 @@ Vine.prototype.send = function(type, data) {
 
     address = peer.address;
     port = peer.port;
+    id = peer.uuid;
 
   }
   else if (!arguments[3]) {
@@ -353,7 +354,7 @@ Vine.prototype.send = function(type, data) {
     client.on('error', function(err) {
 
       if (attempts === 0) {
-        reconnect = setInterval(connect, that.reconnect.interval);
+        reconnect = Timers(that.reconnect.interval, id, connect);
       }
 
       ++attempts;

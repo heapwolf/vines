@@ -1,30 +1,27 @@
-
-[Node Vines](https://raw.github.com/hij1nx/vines/master/node-vines.png)
-
-# Vines
+![Node Vines](https://raw.github.com/hij1nx/vines/master/node-vines.png)
 
 A distributed system has many discrete processes that run on a multitude of
 arbitrary devices and networks yet to the user it appears to be a single
 coherent program. Distributed systems can help to provide availability and 
 fault tolerance.
 
-Since fault-tolerance and absolute consistency are not exactly compatable, 
-`vines` attempts to make data replication and coordinated decision making 
-through a combination of [eventual consistency][0] and 
+Since fault-tolerance and strong consistency are not exactly compatable, 
+Vines attempts to facilitate data replication and coordinated decision 
+making through a combination of [eventual consistency][0] and 
 [quorum-based concensus][1].
 
-
-A computer at `192.168.0.2`
+A computer at `192.168.0.2` can generate some information.
 
 ```js
   var vine = Vine()
 
   vine
     .listen(8000)
-    .set('foo', 'hello, world')
+    .gossip('foo', 'hello, world')
 ```
 
-A computer at `192.168.0.3`
+A computer at `192.168.0.3` can discover that information regardless of
+when then peers were connected or when the data was entered.
 
 ```js
   var vine = Vine()
@@ -32,7 +29,45 @@ A computer at `192.168.0.3`
   vine
     .listen(8000)
     .join(8000, '192.168.0.2')
-    .on('data', 'foo')
+    .on('gossip', 'foo', function(value) {
+      console.log(value);
+    })
+```
+
+A computer at `192.168.0.2` can call an election and cast a vote.
+
+```js
+
+  var electionCriteria = {
+    topic: 'email',
+    expire: String(new Date(now.setMinutes(now.getMinutes() + 5))),
+    min: 2,
+    total: 2
+  }
+
+  var vine = Vine()
+
+  vine
+    .listen(8000)
+    .on('quorum', onQuorum)
+    .on('expire', onExpire)
+    .election(electionCriteria)
+    .vote('email', true)
+```
+
+A computer at `192.168.0.3` can also call an election however only one
+of the peers will be able to execute the callback for the `quorum` event.
+
+```js
+  var vine = Vine()
+
+  vine
+    .listen(8000)
+    .join(8000, '192.168.0.2')
+    .on('quorum', onQuorum)
+    .on('expire', onExpire)
+    .election(electionCriteria)
+    .vote('email', true)
 ```
 
 [0]:http://www.oracle.com/technetwork/products/nosqldb/documentation/consistency-explained-1659908.pdf

@@ -9,10 +9,12 @@ fault tolerance.
 
 ## Synopsis
 
-Since fault-tolerance and strong consistency are not exactly compatable, 
-Vines attempts to facilitate data replication and coordinated decision 
-making through a combination of [eventual consistency][0] and 
-[quorum-based concensus][1].
+Fault-tolerance and strong consistency are not exactly compatable. Vines 
+attempts to facilitate data replication and coordinated decision making 
+through a combination of [eventual consistency][0] and [quorum-based concensus][1].
+
+Vines is targeted toward applications that require intelegence distribution
+such as _application monitoring_.
 
 ## Features
 
@@ -21,6 +23,8 @@ making through a combination of [eventual consistency][0] and
  - Gossip based data replication
 
 ## Examples
+
+### Data replication
 
 A computer at `192.168.0.2` can generate some information.
 
@@ -45,6 +49,8 @@ when then peers were connected or when the data was entered.
       console.log(value);
     })
 ```
+
+### Concensus
 
 A computer at `192.168.0.2` can call an election and cast a vote.
 

@@ -354,7 +354,7 @@ Vine.prototype.send = function(type, data) {
     client.on('error', function(err) {
 
       if (attempts === 0) {
-        reconnect = Timers(that.reconnect.interval, id, connect);
+        reconnect = setInterval(connect, that.reconnect.interval);
       }
 
       ++attempts;

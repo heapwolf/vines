@@ -6,7 +6,7 @@ var uuid = require('node-uuid'); // we need unique IDs.
 
 var ip = require('./common/ip'); // for discovering the external IP address
 var SHash = require('./common/SHash'); // A special collection type
-var BallotBox = require('./common/BallotBox'); // for voting
+var BallotBox = require('./common/ballotbox'); // for voting
 
 var timers = {};
 
@@ -354,7 +354,7 @@ Vine.prototype.send = function(type, data) {
     client.on('error', function(err) {
 
       if (attempts === 0) {
-        reconnect = Timers(that.reconnect.interval, id, connect);
+        reconnect = setInterval(connect, that.reconnect.interval);
       }
 
       ++attempts;

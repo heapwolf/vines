@@ -4,7 +4,7 @@
 
 Distributed software provides availability and fault-tolerance. To achieve this, 
 a distributed program has many discrete processes running on a multitude of 
-devices and networks. 
+devices and networks which to the user appear to be a single coherent program.
 
 Each process will produce data. Each process should make informed decisions about
 its own data as well as the data created by other processes. It is not efficient or 

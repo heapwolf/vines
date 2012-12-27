@@ -18,9 +18,9 @@ applications that require intelligence distribution such as _application monitor
 
 ## Features
 
- - Automatic reconnect
- - Quorum based consensus protocol
- - Gossip based data replication
+ - Quorum based consensus; a simple voting protocol that is partition tolerant.
+ - Gossip based data replication; reduces network footprint in large networks.
+ - Attempts automatic reconnect for peer processes before selecting a new random peer.
 
 ## Examples
 

@@ -7,14 +7,14 @@ a distributed program has many discrete processes running on a multitude of
 devices and networks. 
 
 Each process will produce data. Each process should make informed decisions about
-its own data as well as the data created by other processes. It is not effecent or 
+its own data as well as the data created by other processes. It is not efficient or 
 always possible to have all processes in a network synchronize before making a 
 decision.
 
 ## Synopsis
 Vines attempts to facilitate coordinated decision making through a combination of 
-[eventual consistency][0] and [quorum-based concensus][1]. It may be useful for
-applications that require intelegence distribution such as _application monitoring_.
+[eventual consistency][0] and [quorum-based consensus][1]. It may be useful for
+applications that require intelligence distribution such as _application monitoring_.
 
 ## Features
 

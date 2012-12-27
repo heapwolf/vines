@@ -2,19 +2,19 @@
 
 ## Motivation
 
-A distributed system has many discrete processes that run on a multitude of
-arbitrary devices and networks yet to the user it appears to be a single
-coherent program. Distributed systems can help to provide availability and 
-fault tolerance.
+Distributed software provides availability and fault-tolerance. To achieve this, 
+a distributed program has many discrete processes running on a multitude of 
+devices and networks. 
+
+Each process will produce data. Each process should make informed decisions about
+its own data as well as the data created by other processes. It is not effecent or 
+always possible to have all processes in a network synchronize before making a 
+decision.
 
 ## Synopsis
-
-Fault-tolerance and strong consistency are not exactly compatable. Vines 
-attempts to facilitate data replication and coordinated decision making 
-through a combination of [eventual consistency][0] and [quorum-based concensus][1].
-
-Vines is targeted toward applications that require intelegence distribution
-such as _application monitoring_.
+Vines attempts to facilitate coordinated decision making through a combination of 
+[eventual consistency][0] and [quorum-based concensus][1]. It may be useful for
+applications that require intelegence distribution such as _application monitoring_.
 
 ## Features
 

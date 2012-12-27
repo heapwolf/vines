@@ -13,8 +13,8 @@ decision.
 
 ## Synopsis
 Vines attempts to facilitate coordinated decision making through a combination of 
-[eventual consistency][0] and [quorum-based consensus][1]. It may be useful for
-applications that require intelligence distribution such as _application monitoring_.
+[eventual consistency][0] and [quorum-based consensus][1]. Vines may be useful for
+applications such as _monitoring_ and _automated provisioning_.
 
 ## Features
 

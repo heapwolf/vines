@@ -20,7 +20,7 @@ Vines attempts to facilitate coordinated decision making through a combination o
 applications such as _monitoring_ and _automated provisioning_.
 
 Vines aims to be a high level solution. It implements connection machinery. If you
-are looking for a simple streamable gossip implementation, consider [scuttlebutt][2].
+are looking for a simple streamable gossip implementation, consider [scuttlebutt][3].
 
 ## Features
 

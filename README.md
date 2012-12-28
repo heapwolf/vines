@@ -2,14 +2,16 @@
 
 ## Motivation
 
-Distributed software provides availability and fault-tolerance. To achieve this, 
-a distributed program has many discrete processes running on a multitude of 
-devices and networks which to the user appear to be a single coherent program.
+Distributed software provides availability and fault-tolerance. To achieve this, a 
+distributed program has more than one discrete processes that run on any number of 
+devices or networks. If any of the processes in the program are partitioned or lost 
+for any reason, the program can continue to run. All of this happens behind the scenes, 
+and the user will observe a single coherent program.
 
-Each process will produce data. Each process should make informed decisions about
-its own data as well as the data created by other processes. It is not efficient or 
-always possible to have all processes in a network synchronize before making a 
-decision.
+Each process in a distributed program will produce data. Each process should make 
+well informed decisions that are based on its own data as well as the data created by 
+other processes in the program. It is not efficient or always possible to have all 
+processes in a network synchronize before making a decision.
 
 ## Synopsis
 Vines attempts to facilitate coordinated decision making through a combination of 

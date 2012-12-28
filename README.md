@@ -19,6 +19,9 @@ Vines attempts to facilitate coordinated decision making through a combination o
 [eventual consistency][0] and [quorum-based consensus][1]. Vines may be useful for
 applications such as _monitoring_ and _automated provisioning_.
 
+Vines aims to be a high level solution. It implements connection machinery. If you
+are looking for a simple streamable gossip implementation, consider [scuttlebutt][2].
+
 ## Features
 
  - Quorum based consensus; a simple voting protocol that is partition tolerant.
@@ -94,5 +97,6 @@ of the peers will be able to execute the callback for the `quorum` event.
 [0]:http://www.oracle.com/technetwork/products/nosqldb/documentation/consistency-explained-1659908.pdf
 [1]:http://pbs.cs.berkeley.edu/pbs-vldb2012.pdf
 [2]:http://www.cs.utexas.edu/~lorenzo/papers/p14-alvisi.pdf
-[3]:http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=5A7801DAF5FBEDD7D15599DEA8AA2677?doi=10.1.1.34.9524&rep=rep1&type=pdf
-[4]:http://net.pku.edu.cn/~course/cs501/2011/resource/2006-Book-distributed%20systems%20principles%20and%20paradigms%202nd%20edition.pdf
+[3]:https://github.com/dominictarr/scuttlebutt
+[4]:http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=5A7801DAF5FBEDD7D15599DEA8AA2677?doi=10.1.1.34.9524&rep=rep1&type=pdf
+[5]:http://net.pku.edu.cn/~course/cs501/2011/resource/2006-Book-distributed%20systems%20principles%20and%20paradigms%202nd%20edition.pdf
